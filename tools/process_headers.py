@@ -195,10 +195,11 @@ def generate_init_cpp():
     if len(vtable_list) > 0:
         for a in vtable_list:
             name = a["name"]
+            address = a["address"]
 
-            if a["address"] != "":
-                output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(SlideAddress(" + a["address"] + "));")
-            if a["overload"] == "always" or (a["overload"] == "null" and a["address"] == ""):
+            if type(address) == str and address != "":
+                output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(SlideAddress(" + address + "));")
+            if a["overload"] == "always" or (a["overload"] == "null" and address == ""):
                 output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(FindVtable(\"" + name + "\"));")
     output_cxx("}")
     output_cxx("")
@@ -207,7 +208,20 @@ def generate_init_cpp():
 
     #I want to come back and add support for version based signatures
 
-    cxx_dict_list = [{}, {}]
+    cxx_dict_list = [{}, {}, {}]
+    for vtable in vtable_list:
+        address_list = vtable["address"]
+        if(type(address_list) == list):
+            i = 0
+            for address in address_list:
+                if(address != ""):
+                    cxx_str = "\t\t" + vtable["name"] + "_vtable = reinterpret_cast<void*>(SlideAddress(" + address_list[i] + "));"
+                    if(version_list[i] not in cxx_dict_list[0]):
+                        cxx_dict_list[0][version_list[i]] = [ cxx_str ]
+                    else:
+                        cxx_dict_list[0][version_list[i]].append(cxx_str)
+                i += 1
+
     for sym in symbol_list:
         address_list = sym["address"]
         if(type(address_list) == list):
@@ -215,10 +229,10 @@ def generate_init_cpp():
             for address in address_list:
                 if(address != ""):
                     cxx_str = "\t\t" + sym["name"] + "_ptr = reinterpret_cast<void*>(SlideAddress(" + address_list[i] + "));"
-                    if(version_list[i] not in cxx_dict_list[0]):
-                        cxx_dict_list[0][version_list[i]] = [ cxx_str ]
+                    if(version_list[i] not in cxx_dict_list[1]):
+                        cxx_dict_list[1][version_list[i]] = [ cxx_str ]
                     else:
-                        cxx_dict_list[0][version_list[i]].append(cxx_str)
+                        cxx_dict_list[1][version_list[i]].append(cxx_str)
                 i += 1
 
     for var in var_list:
@@ -229,15 +243,15 @@ def generate_init_cpp():
                 if(address != ""):
                     offset = var["name"].rfind("*") + 1
                     cxx_str = "\t\t" + var["name"][offset:].strip() + " = reinterpret_cast<" + var["name"][:offset] + ">(SlideAddress(" + address_list[i] + "));"
-                    if(version_list[i] not in cxx_dict_list[1]):
-                        cxx_dict_list[1][version_list[i]] = [ cxx_str ]
+                    if(version_list[i] not in cxx_dict_list[2]):
+                        cxx_dict_list[2][version_list[i]] = [ cxx_str ]
                     else:
-                        cxx_dict_list[1][version_list[i]].append(cxx_str)
+                        cxx_dict_list[2][version_list[i]].append(cxx_str)
                 i += 1
 
     prefix = ""
     for version in version_list:
-        output_cxx("\t" + prefix + "if(versionId == Zenova::Minecraft::v" + version.replace(".", "_") + ") {")
+        output_cxx("\t" + prefix + "if(versionId == \"" + version + "\") {")
         for cxx_dict in cxx_dict_list:
             for cxx in cxx_dict.get(version, []):
                 output_cxx(cxx)
@@ -307,7 +321,6 @@ def generate_init_func_x86(bit):
         output_asm("\tjmp rax")
     for vtable in vtable_list:
         vtable_out = process_vtable(vtable)
-        print(vtable_out["name"] + "\n")
         for a in vtable_out["functions_out"]:
             output_asm("global " + a[0])
             output_asm(a[0] + ":")
