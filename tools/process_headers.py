@@ -130,25 +130,27 @@ def mangled_name_to_variable(str):
     return str
 
 def generate_init_cpp():
+    #flags
+
+
     #*.hxx
     output_header("")
     output_header("#pragma once")
-    output_header("")
-    output_header("#include <Zenova/Hook.h>")
-    output_header("#include <Zenova/Minecraft.h>")
     if len(symbol_list) > 0 or len(vtable_list) > 0:
         output_header("")
         output_header("extern \"C\" {")
         for a in symbol_list:
-            output_header("\textern void* " + a["name"] + "_ptr;")
+            if a["name"]:
+                output_header("\textern void* " + a["name"] + "_ptr;")
         for a in vtable_list:
-            output_header("\textern void* " + a["name"] + "_vtable;")
+            if a["name"]:
+                output_header("\textern void* " + a["name"] + "_vtable;")
         output_header("}")
-    output_header("")
-    output_header("void InitBedrockPointers();")
-    output_header("void InitVersionPointers(const Zenova::Version&);")
 
     #*.cxx
+    output_cxx("")
+    output_cxx("#include <Zenova/Hook.h>")
+    output_cxx("#include <Zenova/Minecraft.h>")
     output_cxx("")
     output_cxx("#include \"" + file_header_name + "\"")
     for a in include_list:
@@ -161,50 +163,53 @@ def generate_init_cpp():
     for a in var_list:
         address = a["address"]
         name = a["name"]
-        if address and type(address) == str:
-            output_cxx(name + " = reinterpret_cast<" + name[:name.rfind("*")+1] + ">(SlideAddress(" + address + "))" + ";")
-        else:
-            output_cxx(name + ";")
+        if name:
+            if address and type(address) == str:
+                output_cxx(name + " = reinterpret_cast<" + name[:name.rfind("*")+1] + ">(SlideAddress(" + address + "))" + ";")
+            else:
+                output_cxx(name + ";")
     output_cxx("")
 
     output_cxx("extern \"C\" {")
     for a in symbol_list:
-        output_cxx("\tvoid* " + a["name"] + "_ptr;")
+        if a["name"]:
+            output_cxx("\tvoid* " + a["name"] + "_ptr;")
     for a in vtable_list:
-        output_cxx("\tvoid* " + a["name"] + "_vtable;")
+        if a["name"]:
+            output_cxx("\tvoid* " + a["name"] + "_vtable;")
     output_cxx("}")
     output_cxx("")
 
     output_cxx("void InitBedrockPointers() {")
-    if len(var_list) > 0:
-        for a in var_list:
-            if a["address"] == "":
-                offset = a["name"].rfind("*") + 1
-                output_cxx("\t" + a["name"][offset:].strip() + " = reinterpret_cast<" + a["name"][:offset] + ">(FindVariable(\"" + a["name"] + "\"));")
-
-    if len(symbol_list) > 0:
-        for a in symbol_list:
-            address = a["address"]
-            if(type(address) == str and address != ""):
-                output_cxx("\t" + a["name"] + "_ptr = reinterpret_cast<void*>(SlideAddress(" + address + "));")
-                
-            signature = a["signature"]
-            if(type(signature) == dict and len(signature) == 3):
-                output_cxx("\t" + a["name"] + "_ptr = reinterpret_cast<void*>(" + signature["type"] + "(\"" + signature["sig"] + "\", \"" + signature["mask"] + "\"));")
-
-    if len(vtable_list) > 0:
-        for a in vtable_list:
+    for a in var_list:
+        address = a["address"]
+        if type(address) == str and address != "":
             name = a["name"]
-            address = a["address"]
+            offset = name.rfind("*") + 1
+            output_cxx("\t" + name[offset:].strip() + " = reinterpret_cast<" + name[:offset] + ">(FindVariable(\"" + name + "\"));")
 
-            if type(address) == str and address != "":
-                output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(SlideAddress(" + address + "));")
-            if a["overload"] == "always" or (a["overload"] == "null" and address == ""):
-                output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(FindVtable(\"" + name + "\"));")
+    for a in symbol_list:
+        address = a["address"]
+        if type(address) == str and address != "":
+            output_cxx("\t" + a["name"] + "_ptr = reinterpret_cast<void*>(SlideAddress(" + address + "));")
+            
+        signature = a["signature"]
+        if type(signature) == dict and len(signature) == 3: #signature_helper
+            output_cxx("\t" + a["name"] + "_ptr = reinterpret_cast<void*>(" + signature["type"] + "(\"" + signature["sig"] + "\", \"" + signature["mask"] + "\"));")
+
+    for a in vtable_list:
+        name = a["name"]
+        address = a["address"]
+
+        if type(address) == str and address != "":
+            output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(SlideAddress(" + address + "));")
+        if a["overload"] == "always" or (a["overload"] == "null" and address == ""):
+            output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(FindVtable(\"" + name + "\"));")
     output_cxx("}")
     output_cxx("")
 
-    output_cxx("void InitVersionPointers(const Zenova::Version& versionId) {")
+    output_cxx("void InitVersionPointers() {")
+    output_cxx("\tconst Zenova::Version& versionId = Zenova::Minecraft::version();")
 
     #I want to come back and add support for version based signatures
 
@@ -259,8 +264,6 @@ def generate_init_cpp():
         prefix = "else " if(prefix == "") else prefix
 
     output_cxx("}")
-
-
 
 def process_vtable(vtable):
     vtable_out = next((x for x in vtable_output if vtable["name"] == x["name"]), {})
@@ -327,6 +330,20 @@ def generate_init_func_x86(bit):
             output_asm("\tmov " + reg + ", [rel " + vtable_out["name"] + "_vtable]")
             output_asm("\tjmp [" + reg + "+" + str(a[1] * pointer_size) + "]")
 
+
+
+def generate_init_windows():
+    output_cxx("")
+    output_cxx("BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved) {")
+    output_cxx("\tif(fdwReason == DLL_PROCESS_ATTACH) {")
+    output_cxx("\t\tInitBedrockPointers();")
+    output_cxx("\t\tInitVersionPointers();")
+    output_cxx("\t}")
+    output_cxx("\treturn TRUE;")
+    output_cxx("}")
+
+
+
 def generate_init_func():
     gen_time = datetime.datetime.utcnow().strftime("%a %b %d %Y %H:%M:%S UTC")
     output_cxx("// This file was automatically generated using tools/" + os.path.basename(__file__))
@@ -336,6 +353,9 @@ def generate_init_func():
     output_header("// Generated on " + gen_time)
 
     generate_init_cpp()
+
+    if platform == "windows":
+        generate_init_windows()
 
     output_asm("; This file was automatically generated using tools/" + os.path.basename(__file__))
     output_asm("; Generated on " + gen_time)
