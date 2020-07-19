@@ -1,6 +1,6 @@
 #workaround for the directory symlinks
 
-import os
+from os import path 
 import argparse
 import win32security
 import ntsecuritycon as con
@@ -11,13 +11,15 @@ args = parser.parse_args()
 
 directory = args.directory
 
-path = os.path.abspath(directory)
-app_package, domain, type = win32security.LookupAccountName ("", "all application packages")
+dataPath = path.abspath(directory)
 
-sd = win32security.GetNamedSecurityInfo(path, win32security.SE_FILE_OBJECT, win32security.DACL_SECURITY_INFORMATION)
-dacl = sd.GetSecurityDescriptorDacl()   # instead of dacl = win32security.ACL()
+if path.exists(dataPath):
+    app_package, domain, type = win32security.LookupAccountName ("", "all application packages")
 
-dacl.AddAccessAllowedAceEx(win32security.ACL_REVISION_DS, win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE, con.FILE_ALL_ACCESS, app_package)
+    sd = win32security.GetNamedSecurityInfo(dataPath, win32security.SE_FILE_OBJECT, win32security.DACL_SECURITY_INFORMATION)
+    dacl = sd.GetSecurityDescriptorDacl()   # instead of dacl = win32security.ACL()
 
-sd.SetSecurityDescriptorDacl(1, dacl, 0)   # may not be necessary
-win32security.SetFileSecurity(path, win32security.DACL_SECURITY_INFORMATION, sd)
+    dacl.AddAccessAllowedAceEx(win32security.ACL_REVISION_DS, win32security.OBJECT_INHERIT_ACE | win32security.CONTAINER_INHERIT_ACE, con.FILE_ALL_ACCESS, app_package)
+
+    sd.SetSecurityDescriptorDacl(1, dacl, 0)   # may not be necessary
+    win32security.SetFileSecurity(dataPath, win32security.DACL_SECURITY_INFORMATION, sd)

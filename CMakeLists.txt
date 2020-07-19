@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
 set(ModName Example)
+set(SourceDir src)
+set(IncludeDir inc)
 
+# maybe figure out a way to move this all to another cmake file?
 set(CMAKE_ASM_NASM_OBJECT_FORMAT win64)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -36,20 +39,27 @@ if(MSVC)
 endif()
 
 include_directories("$ENV{ZENOVA_DATA}/dev/inc")
-include_directories("src")
+include_directories("${SourceDir}")
 
 file(GLOB_RECURSE INCLUDE_LIST
-    "src/*.hpp"
-    "src/*.h"
+    "${IncludeDir}/*.hpp"
+    "${IncludeDir}/*.h"
+)
+
+file(GLOB_RECURSE SRC_INCLUDE_LIST
+    "${SourceDir}/*.hpp"
+    "${SourceDir}/*.h"
 )
 
 file(GLOB_RECURSE SOURCE_LIST
-    "src/*.cpp"
-    "src/*.cxx"
-    "src/*.cc"
+    "${SourceDir}/*.cpp"
+    "${SourceDir}/*.cxx"
+    "${SourceDir}/*.cc"
+    "${SourceDir}/*.asm"
 )
 
 add_library(${ModName} SHARED
+    ${SRC_INCLUDE_LIST}
     ${INCLUDE_LIST}
     ${SOURCE_LIST}
 )
@@ -76,9 +86,10 @@ endforeach(resource)
 
 add_custom_command(TARGET ${ModName}
     PRE_BUILD
-    COMMAND py -3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/process_headers.py -a x64 -p windows -d ${CMAKE_CURRENT_SOURCE_DIR}/src/generated ${CMAKE_CURRENT_SOURCE_DIR}/maps/*.json
+    COMMAND py -3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/process_headers.py -a x64 -p windows -d ${CMAKE_CURRENT_SOURCE_DIR}/${SourceDir}/generated ${CMAKE_CURRENT_SOURCE_DIR}/maps/*.json
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/process_headers.py
 )
 
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "Header Files//" FILES ${INCLUDE_LIST})
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/src PREFIX "Source Files//" FILES ${SOURCE_LIST})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/${IncludeDir} PREFIX "Header Files//" FILES ${INCLUDE_LIST})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/${SourceDir} PREFIX "Header Files//" FILES ${SRC_INCLUDE_LIST})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/${SourceDir} PREFIX "Source Files//" FILES ${SOURCE_LIST})
