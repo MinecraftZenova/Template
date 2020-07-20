@@ -82,7 +82,7 @@ def signature_helper(psig):
                 mask += "x"
                 sig += "\\x" + byte
 
-        sigtype = "SigscanCall" if(byteList[0] == "E8") else "Sigscan"
+        sigtype = "SigscanCall" if(byteList[0] == "E8" or byteList[0] == "E9") else "Sigscan"
         
         return { "sig": sig, "mask": mask, "type": sigtype }
 
