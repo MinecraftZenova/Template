@@ -38,8 +38,11 @@ if(MSVC)
     endforeach(OUTPUTCONFIG)
 endif()
 
-include_directories("$ENV{ZENOVA_DATA}/dev/inc")
-include_directories("${SourceDir}")
+include_directories(
+    "$ENV{ZENOVA_DATA}/dev/inc"
+    "${IncludeDir}"
+    "${SourceDir}"
+)
 
 file(GLOB_RECURSE INCLUDE_LIST
     "${IncludeDir}/*.hpp"
@@ -68,26 +71,19 @@ target_link_libraries(${ModName}
     $ENV{ZENOVA_DATA}/dev/lib/ZenovaAPI.lib
 )
 
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/resources/modinfo.json" "$ENV{ZENOVA_DATA}/mods/${ModName}/modinfo.json" COPYONLY)
-
-foreach(resource assets;data)
-    FILE(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/${resource}" src)
-    FILE(TO_CMAKE_PATH "$ENV{ZENOVA_DATA}/mods/${ModName}/${resource}" dest)
-
-    if(NOT EXISTS ${dest})
-        add_custom_command(TARGET ${ModName}
-            POST_BUILD
-            COMMAND py -3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/add_security.py ${src}
-            COMMAND ${CMAKE_COMMAND} -E create_symlink ${src} ${dest}
-            DEPENDS ${src}
-        )
-    endif()
-endforeach(resource)
-
+# generate the asm and cpp files from the symbol map(s)
 add_custom_command(TARGET ${ModName}
     PRE_BUILD
     COMMAND py -3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/process_headers.py -a x64 -p windows -d ${CMAKE_CURRENT_SOURCE_DIR}/${SourceDir}/generated ${CMAKE_CURRENT_SOURCE_DIR}/maps/*.json
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/process_headers.py
+)
+
+# copy the resouces to the mod folder
+add_custom_command(TARGET ${ModName}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/resources
+    $ENV{ZENOVA_DATA}/mods/${ModName}
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/${IncludeDir} PREFIX "Header Files//" FILES ${INCLUDE_LIST})
