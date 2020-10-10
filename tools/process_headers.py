@@ -39,9 +39,10 @@ if(debug_output):
 version_list = []
 symbol_list = []
 vtable_list = []
-vtable_output = []
+vdtor_list = []
 var_list = []
 include_list = []
+vtable_output = []
 cxx_output = ""
 hxx_output = ""
 asm_output = ""
@@ -88,12 +89,23 @@ def signature_helper(psig):
 
     return {}
 
+
+def new_symbol(name, address = "", signature = "", overload = ""):
+    symbol_list.append({
+        "name": mangled_name_to_variable(name),
+        "mangled_name": name,
+        "address": address,
+        "signature": signature_helper(signature),
+        "overload": overload
+    })
+
 def read_json(file):
     reader = json.load(file)
     for key in reader:
         if key == "version":
             for obj in reader[key]:
                 version_list.append(obj)
+
         elif key == "vtable":
             for obj in reader[key]:
                 vtable_list.append({
@@ -103,23 +115,30 @@ def read_json(file):
                     "functions": obj.get("functions", []), 
                     "overload": obj.get("overload", "null")
                 })
+
+                offset = 0
+                for dtor in vtable_list[-1]["functions"]:
+                    if dtor[:3] == "??1":
+                        vdtor_list.append({
+                            "vtable": vtable_list[-1]["name"],
+                            "name": mangled_name_to_variable(dtor),
+                            "mangled_name": dtor,
+                            "address": '0x{:X}'.format(int(vtable_list[-1]["address"], 16) + (offset * 8))
+                        })
+                        vtable_list[-1]["functions"][offset] = ""
+                    offset += 1
+
         elif key == "functions":
             for obj in reader[key]:
-                name = obj["name"]
+                new_symbol(obj["name"], obj.get("address", ""), obj.get("signature", ""), obj.get("overload", "null"))
 
-                symbol_list.append({
-                    "name": mangled_name_to_variable(name),
-                    "mangled_name": name,
-                    "address": obj.get("address", ""),
-                    "signature": signature_helper(obj.get("signature", "")),
-                    "overload": obj.get("overload", "null")
-                })
         elif key == "variables":
             for variable_keys in reader[key].keys():
                 var_list.append({
                     "name": variable_keys, 
                     "address": reader[key][variable_keys]
                 })
+
         elif key == "includes":
             for strs in reader[key]:
                 include_list.append(strs)
@@ -145,6 +164,9 @@ def generate_init_cpp():
         for a in vtable_list:
             if a["name"]:
                 output_header("\textern void* " + a["name"] + "_vtable;")
+        for a in vdtor_list:
+            if a["name"]:
+                output_header("\textern void* " + a["name"] + "_ptr;")
         output_header("}")
 
     #*.cxx
@@ -176,12 +198,15 @@ def generate_init_cpp():
     for a in vtable_list:
         if a["name"]:
             output_cxx("void* " + a["name"] + "_vtable;")
+    for a in vdtor_list:
+        if a["name"]:
+            output_cxx("void* " + a["name"] + "_ptr;")
     output_cxx("")
 
     output_cxx("void InitBedrockPointers() {")
     for a in var_list:
         address = a["address"]
-        if type(address) == str and address != "":
+        if type(address) == str and address == "":
             name = a["name"]
             offset = name.rfind("*") + 1
             output_cxx("\t" + name[offset:].strip() + " = reinterpret_cast<" + name[:offset] + ">(FindVariable(\"" + name + "\"));")
@@ -203,6 +228,9 @@ def generate_init_cpp():
             output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(SlideAddress(" + address + "));")
         if a["overload"] == "always" or (a["overload"] == "null" and address == ""):
             output_cxx("\t" + name + "_vtable = reinterpret_cast<void*>(FindVtable(\"" + name + "\"));")
+
+    for a in vdtor_list:
+        output_cxx("\t" + a["name"] + "_ptr = reinterpret_cast<void*>(GetRealDtor(SlideAddress(" + a["address"] + ")));")
     output_cxx("}")
     output_cxx("")
 
@@ -310,7 +338,9 @@ def generate_init_func_x86(bit):
 
     output_asm("SECTION .data")
     for a in symbol_list:
-        output_asm("extern " + mangled_name_to_variable(a["mangled_name"]) + "_ptr")
+        output_asm("extern " + a["name"] + "_ptr")
+    for a in vdtor_list:
+        output_asm("extern " + a["name"] + "_ptr")
     for a in vtable_list:
         output_asm("extern " + a["name"] + "_vtable")
     output_asm("")
@@ -318,7 +348,12 @@ def generate_init_func_x86(bit):
     for a in symbol_list:
         output_asm("global " + a["mangled_name"])
         output_asm(a["mangled_name"] + ":")
-        output_asm("\tmov rax, [rel " + mangled_name_to_variable(a["mangled_name"]) + "_ptr" + "]")
+        output_asm("\tmov rax, [rel " + a["name"] + "_ptr]")
+        output_asm("\tjmp rax")
+    for a in vdtor_list:
+        output_asm("global " + a["mangled_name"])
+        output_asm(a["mangled_name"] + ":")
+        output_asm("\tmov rax, [rel " + a["name"] + "_ptr]")
         output_asm("\tjmp rax")
     for vtable in vtable_list:
         vtable_out = process_vtable(vtable)
