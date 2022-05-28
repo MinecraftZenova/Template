@@ -1,8 +1,10 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 set(ModName Example)
 set(SourceDir src)
 set(IncludeDir inc)
+set(generated_directory "${CMAKE_CURRENT_SOURCE_DIR}/${SourceDir}/generated")
+set(maps_directory "${CMAKE_CURRENT_SOURCE_DIR}/maps")
 
 # maybe figure out a way to move this all to another cmake file?
 set(CMAKE_ASM_NASM_OBJECT_FORMAT win64)
@@ -21,6 +23,13 @@ if(MSVC)
         set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} "$ENV{ZENOVA_DATA}/mods/${ModName}")
         set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} "$ENV{ZENOVA_DATA}/mods/${ModName}")
     endforeach(OUTPUTCONFIG)
+endif()
+
+if(NOT EXISTS ${generated_directory})
+    file(MAKE_DIRECTORY ${generated_directory})
+    file(TOUCH "${generated_directory}/initasm.asm")
+    file(TOUCH "${generated_directory}/initcpp.cpp")
+    file(TOUCH "${generated_directory}/initcpp.h")
 endif()
 
 include_directories(
@@ -57,9 +66,10 @@ target_link_libraries(${ModName}
 )
 
 # generate the asm and cpp files from the symbol map(s)
-add_custom_command(TARGET ${ModName}
-    PRE_BUILD
-    COMMAND py -3 $ENV{ZENOVA_DATA}/dev/tools/process_symbol_map.py -e -a x64 -p windows -d ${CMAKE_CURRENT_SOURCE_DIR}/${SourceDir}/generated ${CMAKE_CURRENT_SOURCE_DIR}/maps/*.json
+add_custom_command(
+    OUTPUT "${generated_directory}/initcpp.cpp" "${generated_directory}/initasm.asm" "${generated_directory}/initcpp.h"
+    COMMAND py -3 $ENV{ZENOVA_DATA}/dev/tools/process_symbol_map.py -e -a x64 -p windows -d ${generated_directory} ${maps_directory}/*.json
+    DEPENDS $ENV{ZENOVA_DATA}/dev/tools/process_symbol_map.py ${maps_directory}/*.json
 )
 
 # copy the resouces to the mod folder
