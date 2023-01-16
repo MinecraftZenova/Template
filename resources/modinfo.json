@@ -1,9 +1,12 @@
 {
-    "nameId": "Example",
+    "nameId": "Template",
     "name": "Template Name",
     "description": "Template Description",
     "version": "1.0.0",
     "mcversion": [
-        "1.14.60.5"
+        "1.16.40.2",
+        "1.14.60.5",
+        "1.12.1.1",
+        "1.0.0.16"
     ]
 }
