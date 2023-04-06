@@ -2,7 +2,7 @@
     "nameId": "Example",
     "name": "Template Name",
     "description": "Template Description",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "mcversion": [
         "1.14.60.5"
     ]

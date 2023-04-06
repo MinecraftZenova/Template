@@ -8,13 +8,11 @@ MOD_FUNCTION void ModLoad(ModContext& ctx) {
 }
 
 // Called after Minecraft main
-// todo: implement above (currently called after ~2 seconds)
 MOD_FUNCTION void ModStart() {
 	Zenova_Info("Mod Started!");
 }
 
-// Called every Minecraft tick (must be in world)
-// todo: implement above (currently calls every 1/20th second)
+// Called every every 1/20th second
 MOD_FUNCTION void ModTick() {
 
 }
