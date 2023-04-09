@@ -28,9 +28,13 @@ set(ModName Example)
 
 ## Building
 
-* Open the CMake GUI app and point the source code to the repository download
-* For the build directory, use a build directory inside the source code directory
-* Click configure and choose Visual Studio with x64 as the optional platform
-* Click finish and then click generate
-* Open the solution file in the build folder to open your mod project
-* Once you build your files will be put into the proper mod folder in `%zenova_data%/mods/`
+1. Open the CMake GUI application
+2. Click on `Browse Source` and select the folder containing the repository
+3. Create a new folder for the build output in the repository folder
+4. Click on `Browse Build` and select your build folder
+5. Click on `Configure` and select `Visual Studio 20XX` as the generator
+6. Choose `x64` as the optional platform
+7. After the configuration process finishes, click on `Generate` to create the Visual Studio solution and project files in the build folder
+8. Open the solution file in Visual Studio. 
+9. Build the project under the `Build` menu and selecting `Build Solution`
+10. After the build is complete, the generated files will be placed in the mod folder located at `%zenova_data%/mods/`
